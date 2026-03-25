@@ -118,6 +118,7 @@ for target in ["pIC50_B2", "pIC50_B1"]:
             colsample_bytree=0.8,
             reg_alpha=0.1,
             reg_lambda=1.0,
+            early_stopping_rounds=50,
             random_state=42,
             n_jobs=-1,
             verbosity=0
@@ -125,7 +126,6 @@ for target in ["pIC50_B2", "pIC50_B1"]:
         xgb_model.fit(
             X_tr, y_tr,
             eval_set=[(X_vl, y_vl)],
-            early_stopping_rounds=50,
             verbose=False
         )
 

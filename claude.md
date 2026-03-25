@@ -145,6 +145,24 @@ pIC50 = 6 - log10(IC50_uM)   # 仅适用于 μM 单位
 **当前数据（专利来源）明确标注单位为 μM，公式正确。**
 若后续引入其他来源数据（如 ChEMBL、内部实验），必须先统一单位再运行脚本，或在 `step1_preprocess.py` 中添加单位转换逻辑。
 
+### XGBoost early_stopping_rounds 参数位置修正（XGBoost ≥ 2.0）
+
+XGBoost ≥ 2.0 中 `early_stopping_rounds` 必须在**构造函数**中传入，不能再传给 `fit()`，否则报：
+```
+TypeError: XGBModel.fit() got an unexpected keyword argument 'early_stopping_rounds'
+```
+
+已修改 `step4_train.py`：
+```python
+# 修改前（XGBoost < 2.0 写法，现已报错）
+xgb_model = xgb.XGBRegressor(n_estimators=500, ...)
+xgb_model.fit(X_tr, y_tr, eval_set=[...], early_stopping_rounds=50)
+
+# 修改后（XGBoost ≥ 2.0 正确写法）
+xgb_model = xgb.XGBRegressor(n_estimators=500, ..., early_stopping_rounds=50)
+xgb_model.fit(X_tr, y_tr, eval_set=[...])
+```
+
 ### SMILES 标准化函数修正（RDKit 2024 兼容性）
 
 `rdMolStandardize.Standardizer()` 在 RDKit 2024 中对部分分子抛出异常，被 `except Exception: return None` 静默吞掉，导致全部 457 个 SMILES 返回 None，所有化合物被丢弃。
