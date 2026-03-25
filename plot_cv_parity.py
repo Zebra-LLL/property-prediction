@@ -25,7 +25,7 @@ os.makedirs("figures", exist_ok=True)
 
 # ── Load ───────────────────────────────────────────────────────────────────────
 df = pd.read_csv("data_cleaned.csv")
-X  = np.load("features/X_combined.npy")
+X  = np.load("features/X_selected.npy")   # (415, 300) — after feature selection
 
 # ── Stratified-scaffold CV (shared with step4_train.py) ───────────────────────
 def stratified_scaffold_cv(valid_orig_idx, scaffold_col, n_splits=5, seed=42):

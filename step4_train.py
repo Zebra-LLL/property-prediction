@@ -11,7 +11,7 @@ Final models:  Trained on ALL valid data (CV-selected hyperparams)
   - No fixed test set; CV R² is the reported performance metric
 
 Inputs:  data_cleaned.csv  (requires 'scaffold' column from step3)
-         features/X_combined.npy  (415, 2189) — ECFP4 + RDKit descriptors
+         features/X_selected.npy  (415, 300)  — after step2b feature selection
 
 Outputs: models/{rf,xgb,svr}_{b2,b1}_final.pkl
          models/train_results.pkl
@@ -39,7 +39,7 @@ os.makedirs("models", exist_ok=True)
 
 # ── Load ───────────────────────────────────────────────────────────────────────
 df = pd.read_csv("data_cleaned.csv")
-X  = np.load("features/X_combined.npy")   # (415, 2189)
+X  = np.load("features/X_selected.npy")   # (415, 300) — after feature selection
 
 # ── Stratified-scaffold CV splitter ───────────────────────────────────────────
 def stratified_scaffold_cv(valid_orig_idx, scaffold_col, n_splits=5, seed=42):

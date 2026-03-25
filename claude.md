@@ -110,7 +110,8 @@ pip install deepchem
 | 脚本 | 功能 | 输出 |
 |------|------|------|
 | `step1_preprocess.py` | 数据清洗、SMILES标准化、pIC50换算、InChIKey去重 | `data_cleaned.csv` |
-| `step2_features.py` | ECFP4(2048-bit) + RDKit 2D描述符（方差过滤） | `features/*.npy`, `features/*.pkl` |
+| `step2_features.py` | ECFP4(2048-bit) + RDKit 2D描述符（方差过滤） | `features/X_combined.npy` (2189d) |
+| `step2b_feature_select.py` | 三阶段特征筛选（方差/相关性/RF重要性）+ CV前后对比 | `features/X_selected.npy` (300d) |
 | `step3_split.py` | Bemis-Murcko scaffold（保留文件供参考，step4不再使用测试集） | `splits/*.npz` |
 | `step4_train.py` | RF + XGB + SVR，stratified-scaffold 5-fold CV + 最终全量训练 | `models/*_final.pkl`, `models/train_results.pkl` |
 | `step6_shap.py` | XGBoost SHAP全局重要性图 + 单化合物force plot | `results/shap_*.png`, `results/feature_importance_*.csv` |
@@ -129,38 +130,57 @@ pip install deepchem
 
 **不设固定测试集**，CV R² 为唯一报告指标；最终模型在全量有效数据上训练。
 
-### 当前模型性能（Stratified-scaffold 5-fold CV）
+### 当前模型性能（Stratified-scaffold 5-fold CV，X_selected 300d）
 
 **数据：** 457条原始数据 → 415个去重化合物；B2有效371个，B1有效334个；独特骨架119个
 
 | 模型 | CYP11B2 CV R² | CYP11B1 CV R² |
 |------|--------------|--------------|
-| RF   | 0.418 ± 0.083 | 0.369 ± 0.062 |
-| XGB  | 0.451 ± 0.069 | 0.409 ± 0.062 |
-| SVR  | **0.491 ± 0.103** | **0.440 ± 0.091** |
+| RF   | 0.422 ± 0.080 | 0.373 ± 0.059 |
+| XGB  | 0.451 ± 0.059 | 0.419 ± 0.063 |
+| SVR  | **0.575 ± 0.064** | **0.502 ± 0.063** |
 
-**富集因子（SVR，stratified-scaffold CV）：**
+**特征筛选前后对比（SVR）：**
 
-| 靶标 | EF@10% | EF@20% |
-|------|--------|--------|
-| CYP11B2 (pIC50 > 7.5) | 1.61 | 1.58 |
-| CYP11B1 (pIC50 < 6.0) | 2.08 | 1.91 |
+| 特征集 | B2 CV R² | B1 CV R² |
+|--------|---------|---------|
+| X_combined (2189d) | 0.491 | 0.440 |
+| X_selected (300d)  | **0.575** | **0.502** |
+| Δ | +0.084 | +0.062 |
+
+**富集因子（X_selected，stratified-scaffold CV）：**
+
+| 模型 | 靶标 | 阈值 | EF@10% | EF@20% |
+|------|------|------|--------|--------|
+| XGB | CYP11B2 | pIC50 > 7.5 | 1.56 | 1.54 |
+| SVR | CYP11B2 | pIC50 > 7.5 | 1.52 | 1.52 |
+| XGB | CYP11B1 | pIC50 < 6.0 | 2.08 | 1.82 |
+| SVR | CYP11B1 | pIC50 < 6.0 | 1.95 | 1.88 |
 
 **运行环境：** 系统 Python 3.11，rdkit-2025.9.6、xgboost-3.2.0、shap-0.51.0、scikit-learn-1.8.0
 
 ### 特征集
 
-`X_combined.npy`（415 × 2189）= ECFP4（2048维）+ RDKit 2D描述符（141维，方差过滤后）
+三阶段筛选（`step2b_feature_select.py`）：
+
+| 阶段 | 操作 | 剩余特征数 |
+|------|------|-----------|
+| 原始 | X_combined | 2189 |
+| 方差过滤 | threshold=0.01 | 539 |
+| 相关性过滤 | \|r\|>0.95 去重 | 466 |
+| RF重要性 | 平均B2+B1，top 300 | **300** |
+
+保存为 `features/X_selected.npy`（415 × 300）
 
 ### 最终模型文件
 
 ```
-models/rf_{b2,b1}_final.pkl    # Random Forest，训练于全量数据
-models/xgb_{b2,b1}_final.pkl   # XGBoost，训练于全量数据
-models/svr_{b2,b1}_final.pkl   # SVR（Optuna调参），训练于全量数据
+models/rf_{b2,b1}_final.pkl    # Random Forest，训练于全量数据（300d特征）
+models/xgb_{b2,b1}_final.pkl   # XGBoost，训练于全量数据（300d特征）
+models/svr_{b2,b1}_final.pkl   # SVR（Optuna调参），训练于全量数据（300d特征）
 ```
 
-所有模型均为 `Pipeline(StandardScaler → model)`，可直接 `model.predict(X_combined)`。
+所有模型均为 `Pipeline(StandardScaler → model)`，可直接 `model.predict(X_selected)`。
 
 ---
 
