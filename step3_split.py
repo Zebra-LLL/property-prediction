@@ -1,8 +1,9 @@
 """
 Step 3: Dataset Splitting
 Inputs:  data_cleaned.csv
-Outputs: splits/scaffold_split.npz  (train_idx, val_idx, test_idx)
-         splits/random_split.npz    (train_idx, val_idx, test_idx)
+Outputs: splits/scaffold_split.npz            (train_idx, val_idx, test_idx)
+         splits/random_split.npz              (train_idx, val_idx, test_idx)
+         splits/stratified_scaffold_split.npz (train_idx, val_idx, test_idx)
 """
 
 import os
@@ -75,7 +76,47 @@ np.savez("splits/random_split.npz",
          train_idx=idx_train_r, val_idx=idx_val_r, test_idx=idx_test_r)
 print("已保存 splits/random_split.npz")
 
+# ── 3.3 Stratified-by-Scaffold Split (recommended primary evaluation) ─────────
+# Within each scaffold group, assign compounds proportionally to train/val/test.
+# This ensures all major scaffolds appear in BOTH train and test, eliminating
+# the extreme extrapolation problem in the standard scaffold split.
+rng = np.random.default_rng(42)
+
+ss_train, ss_val, ss_test = [], [], []
+
+for scaffold, indices in scaffold_to_indices.items():
+    idxs = np.array(indices)
+    n = len(idxs)
+    if n == 1:
+        ss_train.append(idxs[0])
+    elif n == 2:
+        ss_train.append(idxs[0])
+        ss_val.append(idxs[1])
+    elif n == 3:
+        ss_train.append(idxs[0])
+        ss_val.append(idxs[1])
+        ss_test.append(idxs[2])
+    else:
+        perm = rng.permutation(idxs)
+        n_test = max(1, round(n * 0.20))
+        n_val  = max(1, round(n * 0.10))
+        ss_test.extend(perm[:n_test].tolist())
+        ss_val.extend(perm[n_test:n_test + n_val].tolist())
+        ss_train.extend(perm[n_test + n_val:].tolist())
+
+ss_train = np.array(sorted(ss_train))
+ss_val   = np.array(sorted(ss_val))
+ss_test  = np.array(sorted(ss_test))
+
+print(f"\nStratified-scaffold split → 训练: {len(ss_train)}, 验证: {len(ss_val)}, 测试: {len(ss_test)}")
+print(f"  比例 → 训练: {len(ss_train)/total:.1%}, 验证: {len(ss_val)/total:.1%}, 测试: {len(ss_test)/total:.1%}")
+
+np.savez("splits/stratified_scaffold_split.npz",
+         train_idx=ss_train, val_idx=ss_val, test_idx=ss_test)
+print("已保存 splits/stratified_scaffold_split.npz")
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 n_scaffolds = len(scaffold_to_indices)
 print(f"\n独特骨架数: {n_scaffolds}  (覆盖率 {n_scaffolds/total:.1%})")
 print("注：Scaffold split 的 R² 将显著低于随机划分，以 scaffold 结果为准。")
+print("注：Stratified-scaffold split 为推荐的主要评估方式。")

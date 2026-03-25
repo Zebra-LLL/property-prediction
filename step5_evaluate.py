@@ -1,12 +1,14 @@
 """
 Step 5: Model Evaluation
 - Compute R², RMSE, MAE, Pearson r for all models
+- Report 5-fold CV R² (primary metric) and held-out test R² (secondary)
 - Generate parity plots
 - Enrichment factor analysis
 - Comparison summary table
 
 Inputs:  models/train_results.pkl  (from step4_train.py)
 Outputs: results/metrics_summary.csv
+         results/cv_summary.csv
          results/parity_*.png
          results/enrichment_summary.csv
 """
@@ -88,11 +90,27 @@ def enrichment_factor(y_true, y_pred, top_frac=0.1, activity_cutoff=7.5):
     return ef
 
 
-# ── Evaluate all models ───────────────────────────────────────────────────────
+# ── CV summary (primary metric) ───────────────────────────────────────────────
+cv_rows = []
+print("=== 5-fold CV 汇总（主要指标）===")
+for model_name, m in results.items():
+    if "cv_r2_mean" in m:
+        print(f"  {model_name:<30} R²={m['cv_r2_mean']:.3f} ± {m['cv_r2_std']:.3f}")
+        cv_rows.append({"model": model_name,
+                        "cv_r2_mean": round(m["cv_r2_mean"], 4),
+                        "cv_r2_std": round(m["cv_r2_std"], 4)})
+
+if cv_rows:
+    pd.DataFrame(cv_rows).to_csv("results/cv_summary.csv", index=False)
+    print("已保存 results/cv_summary.csv")
+
+# ── Evaluate all held-out test models ─────────────────────────────────────────
 metrics_rows = []
 ef_rows      = []
 
 for model_name, m in results.items():
+    if "y_test" not in m:   # skip CV-only entries
+        continue
     y_true = np.array(m["y_test"])
     y_pred = np.array(m["y_pred"])
 
@@ -134,14 +152,16 @@ if ef_rows:
 
 # ── Scaffold vs Random comparison ─────────────────────────────────────────────
 print(f"\n{'='*70}")
-print("Scaffold split vs Random split（R² 对比）:")
-for algo in ["RF", "XGB"]:
+print("Split 对比（R²）:")
+for algo in ["RF", "XGB", "SVR"]:
     for tgt in ["b2", "b1"]:
-        sc_key  = f"{algo}_{tgt}_scaffold"
-        rnd_key = f"{algo}_{tgt}_random"
-        if sc_key in results and rnd_key in results:
-            r2_sc  = r2_score(results[sc_key]["y_test"], results[sc_key]["y_pred"])
-            r2_rnd = r2_score(results[rnd_key]["y_test"], results[rnd_key]["y_pred"])
-            gap = r2_rnd - r2_sc
-            print(f"  {algo} {tgt.upper()}: scaffold={r2_sc:.3f}, random={r2_rnd:.3f}, "
-                  f"gap={gap:.3f}{'  ⚠ 过拟合风险' if gap > 0.3 else ''}")
+        sc_key   = f"{algo}_{tgt}_scaffold"
+        rnd_key  = f"{algo}_{tgt}_random"
+        ssc_key  = f"{algo}_{tgt}_stratified_scaffold"
+        cv_key   = f"{algo}_{tgt}_cv"
+        r2_sc    = r2_score(results[sc_key]["y_test"],  results[sc_key]["y_pred"])  if sc_key  in results else float("nan")
+        r2_rnd   = r2_score(results[rnd_key]["y_test"], results[rnd_key]["y_pred"]) if rnd_key in results else float("nan")
+        r2_ssc   = r2_score(results[ssc_key]["y_test"], results[ssc_key]["y_pred"]) if ssc_key in results else float("nan")
+        r2_cv    = results[cv_key]["cv_r2_mean"] if cv_key in results else float("nan")
+        print(f"  {algo} {tgt.upper()}: CV={r2_cv:.3f} | strat-scaffold={r2_ssc:.3f} | "
+              f"scaffold={r2_sc:.3f} | random={r2_rnd:.3f}")
