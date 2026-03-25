@@ -38,6 +38,62 @@
 rdkit, pandas, numpy, scikit-learn, xgboost, lightgbm, deepchem, shap, matplotlib, scipy
 ```
 
+## 环境配置（conda）
+
+> **推荐 Python 3.10**：对 RDKit、XGBoost、SHAP 兼容性最佳；DeepChem 需要单独处理（见下文）。
+
+### 快速创建（使用 environment.yml）
+
+```bash
+conda env create -f environment.yml
+conda activate cyp11b_qsar
+```
+
+### 手动创建
+
+```bash
+# 1. 创建环境（rdkit 必须走 conda-forge，pip 安装易出错）
+conda create -n cyp11b_qsar python=3.10 -y
+conda activate cyp11b_qsar
+
+# 2. 核心依赖（conda-forge 渠道）
+conda install -c conda-forge \
+    rdkit=2024.03 \
+    pandas \
+    numpy \
+    scikit-learn \
+    matplotlib \
+    scipy \
+    joblib \
+    -y
+
+# 3. 机器学习模型
+pip install xgboost lightgbm
+
+# 4. 可解释性
+pip install shap
+
+# 5. （可选）DeepChem / AttentiveFP
+# DeepChem 依赖 PyTorch，版本敏感，单独安装以避免冲突
+pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+pip install deepchem
+```
+
+### 各依赖说明
+
+| 包 | 用途 | 安装渠道 | 备注 |
+|----|------|---------|------|
+| `rdkit` | SMILES解析、指纹、描述符、骨架 | **conda-forge** | 不能用 pip 安装，否则易报 segfault |
+| `pandas` / `numpy` | 数据处理 | conda-forge | — |
+| `scikit-learn` | RandomForest、数据划分、预处理 | conda-forge | — |
+| `scipy` | Pearson r 等统计指标 | conda-forge | — |
+| `joblib` | 模型序列化（.pkl） | conda-forge | scikit-learn 自带，无需单独安装 |
+| `xgboost` | XGBoost 回归模型 | pip | — |
+| `lightgbm` | 备选梯度提升模型（当前未用） | pip | — |
+| `shap` | 模型可解释性（TreeExplainer） | pip | — |
+| `matplotlib` | parity plot、SHAP 图 | conda-forge | — |
+| `deepchem` | AttentiveFP 图神经网络（可选） | pip | 需先装 PyTorch；CPU版本即可 |
+
 ## 执行原则
 
 - 遇到报错自行调试修复，无需中断询问
