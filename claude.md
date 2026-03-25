@@ -151,6 +151,19 @@ pip install deepchem
 
 ## 已知问题与注意事项
 
+### SHAP + XGBoost 版本兼容性问题（已修复）
+
+**现象：** 本地 conda 环境运行 `step6_shap.py` 报错：
+```
+ValueError: could not convert string to float: '[5E-1]'
+```
+
+**根因：** XGBoost ≥ 2.0 将 `base_score` 以 `[5E-1]` 括号格式存入模型 JSON，SHAP < 0.44 无法解析该格式。脚本中原有的 `patch_xgb_base_score` 函数调用了 `booster.load_model(bytearray(...))` 试图修复，但 XGBoost 将 bytearray 输入视为二进制 UBJ 格式而非 JSON，导致修复静默失败（被 `except` 吞掉）。
+
+**修复（2026-03-25）：**
+1. `step6_shap.py`：修正 `patch_xgb_base_score`，改用临时文件写入 + `load_model(tmp_path)` 触发 XGBoost 的 JSON 加载路径
+2. `environment.yml`：钉住 `shap>=0.44.0`（该版本原生支持 `[5E-1]` 格式，无需 workaround）和 `xgboost>=2.0`
+
 ### 单位假设硬编码（重要）
 
 `step1_preprocess.py` 中的 pIC50 换算公式固定假设 **IC50 单位为 μM**：

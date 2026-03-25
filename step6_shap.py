@@ -30,20 +30,27 @@ import matplotlib.pyplot as plt
 
 
 def patch_xgb_base_score(model):
-    """Fix XGBoost >=2.0 base_score bracket-string format for SHAP compatibility.
+    """Fix XGBoost >=2.0 base_score bracket-string format for SHAP <0.44 compatibility.
 
-    XGBoost >=2.0 stores base_score as '[5E-1]' inside the model binary data
-    (learner_model_param). SHAP reads this via save_raw('json'), not save_config(),
-    so the fix must go through save_raw / load_model, not save_config / load_config.
+    XGBoost >=2.0 stores base_score as '[5E-1]' in the raw JSON model.
+    Older SHAP fails to parse this. Fix: write corrected JSON to a temp file
+    and reload via load_model(path), which triggers XGBoost's JSON code path.
+    Note: load_model(bytearray(...)) does NOT work here because XGBoost treats
+    raw bytes as binary UBJ format, not JSON.
     """
+    import tempfile
     try:
         booster = model.get_booster()
         raw = json.loads(booster.save_raw("json").decode())
         lmp = raw["learner"]["learner_model_param"]
         bs = lmp.get("base_score", "0.5")
-        if isinstance(bs, str) and "[" in bs:
+        if isinstance(bs, str) and bs.startswith("["):
             lmp["base_score"] = str(float(bs.strip("[]")))
-            booster.load_model(bytearray(json.dumps(raw).encode()))
+            with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
+                json.dump(raw, f)
+                tmp_path = f.name
+            booster.load_model(tmp_path)
+            os.unlink(tmp_path)
     except Exception:
         pass
     return model
