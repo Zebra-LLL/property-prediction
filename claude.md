@@ -7,7 +7,7 @@
 
 ## 数据文件
 
-- `data.txt`：原始活性数据，制表符分隔，三列：
+- `data.in`：原始活性数据，制表符分隔，三列：
   - 第一列：SMILES
   - 第二列：CYP11B2 IC50（μM）
   - 第三列：CYP11B1 IC50（μM）
@@ -116,11 +116,11 @@ pip install deepchem
 | `step6_shap.py` | XGBoost SHAP全局重要性图 + 单化合物force plot | `results/shap_*.png`, `results/feature_importance_*.csv` |
 | `run_pipeline.sh` | 一键执行全流程 | — |
 
-**执行方式**：将 `data.txt` 放入根目录后运行 `bash run_pipeline.sh`
+**执行方式**：将 `data.in` 放入根目录后运行 `bash run_pipeline.sh`
 
 ### 待完成
 
-- [ ] 提供 `data.txt` 后实际运行流程并检查输出
+- [ ] 提供 `data.in` 后实际运行流程并检查输出
 - [ ] 根据运行结果决定是否引入 RDKit 描述符或组合特征
 - [ ] 如需可解释性分析，切换为描述符特征后重新运行 SHAP
 
@@ -144,3 +144,11 @@ pIC50 = 6 - log10(IC50_uM)   # 仅适用于 μM 单位
 
 **当前数据（专利来源）明确标注单位为 μM，公式正确。**
 若后续引入其他来源数据（如 ChEMBL、内部实验），必须先统一单位再运行脚本，或在 `step1_preprocess.py` 中添加单位转换逻辑。
+
+### 数据文件名修正
+
+原始数据文件实际名称为 `data.in`，而非建模指南中示例的 `data.txt`，分隔符不变（制表符）。
+
+已修改的文件：
+- `step1_preprocess.py`：`read_csv("data.txt")` → `read_csv("data.in")`
+- `run_pipeline.sh`：文件存在检查及提示信息均已更新

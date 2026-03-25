@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CYP11B2/B1 QSAR 建模全流程
-# 使用前确保 data.txt 已放置于当前目录
+# 使用前确保 data.in 已放置于当前目录
 # 执行方式: bash run_pipeline.sh
 
 set -e  # 任意步骤失败则退出
@@ -10,8 +10,8 @@ echo " CYP11B2 / CYP11B1 QSAR 建模流程"
 echo "======================================================"
 
 # 检查数据文件
-if [ ! -f "data.txt" ]; then
-    echo "错误：data.txt 不存在，请将原始数据放置于当前目录"
+if [ ! -f "data.in" ]; then
+    echo "错误：data.in 不存在，请将原始数据放置于当前目录"
     exit 1
 fi
 
