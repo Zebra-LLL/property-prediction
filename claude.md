@@ -145,6 +145,29 @@ pIC50 = 6 - log10(IC50_uM)   # 仅适用于 μM 单位
 **当前数据（专利来源）明确标注单位为 μM，公式正确。**
 若后续引入其他来源数据（如 ChEMBL、内部实验），必须先统一单位再运行脚本，或在 `step1_preprocess.py` 中添加单位转换逻辑。
 
+### XGBoost base_score 格式问题（XGBoost ≥ 2.0 + SHAP 兼容性）
+
+XGBoost ≥ 2.0 将 `base_score` 存储为带括号的字符串（如 `'[7.754658E0]'`），SHAP 的 `TreeExplainer` 对其执行 `float(...)` 时抛出：
+```
+ValueError: could not convert string to float: '[7.754658E0]'
+```
+
+已修改两处：
+- **`step4_train.py`**：在 `XGBRegressor()` 构造函数中显式传入 `base_score=0.5`，避免未来保存的模型触发此问题
+- **`step6_shap.py`**：新增 `patch_xgb_base_score()` 函数，加载模型后立即修复 booster config 中的括号格式（兼容已有的保存模型）
+
+```python
+# step6_shap.py 中的修复函数
+def patch_xgb_base_score(model):
+    booster = model.get_booster()
+    cfg = json.loads(booster.save_config())
+    bs = cfg["learner"]["learner_model_param"].get("base_score", "0.5")
+    if isinstance(bs, str) and bs.startswith("["):
+        cfg["learner"]["learner_model_param"]["base_score"] = str(float(bs.strip("[]")))
+        booster.load_config(json.dumps(cfg))
+    return model
+```
+
 ### XGBoost early_stopping_rounds 参数位置修正（XGBoost ≥ 2.0）
 
 XGBoost ≥ 2.0 中 `early_stopping_rounds` 必须在**构造函数**中传入，不能再传给 `fit()`，否则报：

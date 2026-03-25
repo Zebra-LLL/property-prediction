@@ -19,6 +19,7 @@ Outputs: results/shap_summary_b2.png
 """
 
 import os
+import json
 import numpy as np
 import pandas as pd
 import joblib
@@ -26,6 +27,26 @@ import shap
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+
+def patch_xgb_base_score(model):
+    """Fix XGBoost >=2.0 base_score bracket-string format for SHAP compatibility.
+
+    XGBoost >=2.0 stores base_score as '[7.754658E0]' in the booster config.
+    SHAP's TreeExplainer tries float(...) on it and raises ValueError.
+    This function strips the brackets in-place so SHAP can parse it.
+    """
+    try:
+        booster = model.get_booster()
+        cfg = json.loads(booster.save_config())
+        lmp = cfg["learner"]["learner_model_param"]
+        bs = lmp.get("base_score", "0.5")
+        if isinstance(bs, str) and bs.startswith("["):
+            lmp["base_score"] = str(float(bs.strip("[]")))
+            booster.load_config(json.dumps(cfg))
+    except Exception:
+        pass
+    return model
 
 os.makedirs("results", exist_ok=True)
 
@@ -38,7 +59,7 @@ test_idx = sp["test_idx"]
 
 # ── SHAP analysis function ────────────────────────────────────────────────────
 def shap_analysis(target, tag):
-    model = joblib.load(f"models/xgb_{tag}_scaffold.pkl")
+    model = patch_xgb_base_score(joblib.load(f"models/xgb_{tag}_scaffold.pkl"))
 
     mask = df[target].notna().values
     pos  = np.where(mask)[0]

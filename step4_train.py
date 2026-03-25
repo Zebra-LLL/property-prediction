@@ -118,6 +118,7 @@ for target in ["pIC50_B2", "pIC50_B1"]:
             colsample_bytree=0.8,
             reg_alpha=0.1,
             reg_lambda=1.0,
+            base_score=0.5,
             early_stopping_rounds=50,
             random_state=42,
             n_jobs=-1,
