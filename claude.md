@@ -145,6 +145,39 @@ pIC50 = 6 - log10(IC50_uM)   # 仅适用于 μM 单位
 **当前数据（专利来源）明确标注单位为 μM，公式正确。**
 若后续引入其他来源数据（如 ChEMBL、内部实验），必须先统一单位再运行脚本，或在 `step1_preprocess.py` 中添加单位转换逻辑。
 
+### Morgan 指纹 API 迁移（RDKit 2022+）
+
+`AllChem.GetMorganFingerprintAsBitVect()` 在 RDKit 新版本中已废弃，替换为 `rdFingerprintGenerator.GetMorganGenerator`。
+
+已修改 `step2_features.py`：
+
+```python
+# 修改前（旧写法）
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem, Descriptors
+
+def mol_to_ecfp4(smi, n_bits=2048, radius=2):
+    mol = Chem.MolFromSmiles(smi)
+    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
+    arr = np.zeros(n_bits, dtype=np.uint8)
+    DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr
+
+# 修改后（新写法）
+from rdkit.Chem import Descriptors, rdFingerprintGenerator
+
+_morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)  # 模块级，只创建一次
+
+def mol_to_ecfp4(smi):
+    mol = Chem.MolFromSmiles(smi)
+    return _morgan_gen.GetFingerprintAsNumPy(mol).astype(np.uint8)  # 直接返回 numpy array
+```
+
+改动要点：
+- `GetMorganGenerator` + `GetFingerprintAsNumPy` 直接返回 numpy 数组，无需 `DataStructs.ConvertToNumpyArray`
+- generator 在模块级创建一次，避免每个分子重复初始化
+- 移除 `AllChem` 和 `DataStructs` 的导入
+
 ### XGBoost base_score 格式问题（XGBoost ≥ 2.0 + SHAP 兼容性）
 
 XGBoost ≥ 2.0 将 `base_score` 存储为带括号的字符串（如 `'[7.754658E0]'`），SHAP 的 `TreeExplainer` 对其执行 `float(...)` 时抛出：

@@ -14,8 +14,8 @@ import numpy as np
 import pandas as pd
 import joblib
 
-from rdkit import Chem, DataStructs
-from rdkit.Chem import AllChem, Descriptors
+from rdkit import Chem
+from rdkit.Chem import Descriptors, rdFingerprintGenerator
 from rdkit.ML.Descriptors import MoleculeDescriptors
 
 from sklearn.impute import SimpleImputer
@@ -27,14 +27,13 @@ df = pd.read_csv("data_cleaned.csv")
 print(f"化合物数: {len(df)}")
 
 # ── 2.1 Morgan Fingerprint (ECFP4) ────────────────────────────────────────────
-def mol_to_ecfp4(smi, n_bits=2048, radius=2):
+_morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+
+def mol_to_ecfp4(smi):
     mol = Chem.MolFromSmiles(smi)
     if mol is None:
-        return np.zeros(n_bits, dtype=np.uint8)
-    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
-    arr = np.zeros(n_bits, dtype=np.uint8)
-    DataStructs.ConvertToNumpyArray(fp, arr)
-    return arr
+        return np.zeros(2048, dtype=np.uint8)
+    return _morgan_gen.GetFingerprintAsNumPy(mol).astype(np.uint8)
 
 X_ecfp4 = np.vstack(df["smiles_std"].apply(mol_to_ecfp4).values)
 np.save("features/X_ecfp4.npy", X_ecfp4)
