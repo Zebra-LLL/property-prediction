@@ -145,6 +145,38 @@ pIC50 = 6 - log10(IC50_uM)   # 仅适用于 μM 单位
 **当前数据（专利来源）明确标注单位为 μM，公式正确。**
 若后续引入其他来源数据（如 ChEMBL、内部实验），必须先统一单位再运行脚本，或在 `step1_preprocess.py` 中添加单位转换逻辑。
 
+### SMILES 标准化函数修正（RDKit 2024 兼容性）
+
+`rdMolStandardize.Standardizer()` 在 RDKit 2024 中对部分分子抛出异常，被 `except Exception: return None` 静默吞掉，导致全部 457 个 SMILES 返回 None，所有化合物被丢弃。
+
+已修改 `step1_preprocess.py`：
+
+- **移除** `SaltRemover.SaltRemover()` + `Standardizer()`（问题根源）
+- **替换**为 `LargestFragmentChooser` + `Normalizer` + `Uncharger` 的显式调用链
+- **对象实例化移至函数外**，避免每次调用重新加载盐表（原代码每个分子都创建一次，既慢又易出错）
+- 每步操作后添加 `None` 检查
+
+```python
+# 修改前（问题代码）
+def standardize_smiles(smi):
+    remover = SaltRemover.SaltRemover()        # 每次调用重新加载盐表
+    mol = remover.StripMol(mol)
+    standardizer = rdMolStandardize.Standardizer()  # RDKit 2024 下易抛异常
+    mol = standardizer.standardize(mol)
+    ...
+
+# 修改后（正确）
+_normalizer = rdMolStandardize.Normalizer()    # 模块级实例化，只执行一次
+_uncharger  = rdMolStandardize.Uncharger()
+_chooser    = rdMolStandardize.LargestFragmentChooser()
+
+def standardize_smiles(smi):
+    mol = _chooser.choose(mol)      # 取最大片段（desalt）
+    mol = _normalizer.normalize(mol)
+    mol = _uncharger.uncharge(mol)
+    ...
+```
+
 ### B1/B2 列顺序修正
 
 `data.in` 实际列顺序为：`smiles | CYP11B1 | CYP11B2`（B1 在前，B2 在后），与建模指南示例相反。
