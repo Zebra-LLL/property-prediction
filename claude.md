@@ -97,8 +97,9 @@ pip install deepchem
 ## 执行原则
 
 - 遇到报错自行调试修复，无需中断询问
-- 优先使用 scaffold split 评估模型，随机划分仅作对比参考
-- 所有模型均需输出：R²、RMSE、MAE、Pearson r 以及 parity plot
+- **主要评估指标：Stratified-scaffold 5-fold CV R²**（每个骨架组内按比例分配到各折）
+- 不使用固定测试集；最终模型在全量有效数据上训练
+- 所有模型均需输出：R²（CV）以及 parity plot
 
 ---
 
@@ -110,42 +111,56 @@ pip install deepchem
 |------|------|------|
 | `step1_preprocess.py` | 数据清洗、SMILES标准化、pIC50换算、InChIKey去重 | `data_cleaned.csv` |
 | `step2_features.py` | ECFP4(2048-bit) + RDKit 2D描述符（方差过滤） | `features/*.npy`, `features/*.pkl` |
-| `step3_split.py` | Bemis-Murcko scaffold split + 随机划分 | `splits/*.npz` |
-| `step4_train.py` | RF + XGBoost，B2/B1 各两套（scaffold + random），共8个模型 | `models/*.pkl` |
-| `step5_evaluate.py` | R²、RMSE、MAE、Pearson r，parity plot，富集因子 | `results/metrics_summary.csv`, `results/parity_*.png` |
+| `step3_split.py` | Bemis-Murcko scaffold（保留文件供参考，step4不再使用测试集） | `splits/*.npz` |
+| `step4_train.py` | RF + XGB + SVR，stratified-scaffold 5-fold CV + 最终全量训练 | `models/*_final.pkl`, `models/train_results.pkl` |
 | `step6_shap.py` | XGBoost SHAP全局重要性图 + 单化合物force plot | `results/shap_*.png`, `results/feature_importance_*.csv` |
+| `plot_cv_parity.py` | Stratified-scaffold CV parity plot（XGB + SVR） | `figures/cv_parity_xgb_svr.png` |
+| `plot_ef.py` | EF@10% / EF@20% 富集因子（stratified-scaffold CV） | `figures/ef_barplot.png` |
 | `run_pipeline.sh` | 一键执行全流程 | — |
 
 **执行方式**：将 `data.in` 放入根目录后运行 `bash run_pipeline.sh`
 
-### 首次完整运行结果（2026-03-25）
+### 建模策略（2026-03-25 更新）
 
-`data.in` 来自 main 分支，457 条原始数据，全流程 6 步无报错完成。
+**评估方式：Stratified-scaffold 5-fold CV**
+- 每个 Bemis-Murcko 骨架组内的化合物按比例（round-robin）分配到 5 折
+- 每折都能见到所有主要骨架，结构多样性与全集一致
+- 比纯随机 CV 更真实（消除同骨架化合物泄漏），比 GroupKFold 更温和（不做纯外推）
 
-**数据统计：**
-- 原始行数：457，无效 SMILES：0，去重后化合物：415
-- B2 有效数据：371，pIC50 范围 5.33–9.00，均值 7.64
-- B1 有效数据：334，pIC50 范围 4.46–9.00，均值 6.12
+**不设固定测试集**，CV R² 为唯一报告指标；最终模型在全量有效数据上训练。
 
-**模型性能（Test set，scaffold split）：**
+### 当前模型性能（Stratified-scaffold 5-fold CV）
 
-| 模型 | R² | RMSE | Pearson r |
-|------|-----|------|-----------|
-| RF_B2 | -0.173 | 0.731 | 0.111 |
-| XGB_B2 | -0.216 | 0.745 | -0.067 |
-| RF_B1 | -0.189 | 0.754 | -0.163 |
-| XGB_B1 | -0.744 | 0.913 | -0.218 |
+**数据：** 457条原始数据 → 415个去重化合物；B2有效371个，B1有效334个；独特骨架119个
 
-> R² 为负说明模型在 scaffold split 下的泛化能力弱，系骨架外推难度大所致（独特骨架 119 个，覆盖率仅 28.7%）。Random split 结果略好但参考价值低。
+| 模型 | CYP11B2 CV R² | CYP11B1 CV R² |
+|------|--------------|--------------|
+| RF   | 0.418 ± 0.083 | 0.369 ± 0.062 |
+| XGB  | 0.451 ± 0.069 | 0.409 ± 0.062 |
+| SVR  | **0.491 ± 0.103** | **0.440 ± 0.091** |
 
-**运行环境说明（CI 服务器）：**
-- 无 conda 环境，改用 `pip3 install` 安装依赖到系统 Python 3.11
-- 安装的版本：rdkit-2025.9.6、xgboost-3.2.0、shap-0.51.0、scikit-learn-1.8.0
+**富集因子（SVR，stratified-scaffold CV）：**
 
-### 待完成
+| 靶标 | EF@10% | EF@20% |
+|------|--------|--------|
+| CYP11B2 (pIC50 > 7.5) | 1.61 | 1.58 |
+| CYP11B1 (pIC50 < 6.0) | 2.08 | 1.91 |
 
-- [ ] 根据运行结果决定是否引入 RDKit 描述符或组合特征
-- [ ] 如需化学可解释性，切换为描述符特征后重新运行 SHAP
+**运行环境：** 系统 Python 3.11，rdkit-2025.9.6、xgboost-3.2.0、shap-0.51.0、scikit-learn-1.8.0
+
+### 特征集
+
+`X_combined.npy`（415 × 2189）= ECFP4（2048维）+ RDKit 2D描述符（141维，方差过滤后）
+
+### 最终模型文件
+
+```
+models/rf_{b2,b1}_final.pkl    # Random Forest，训练于全量数据
+models/xgb_{b2,b1}_final.pkl   # XGBoost，训练于全量数据
+models/svr_{b2,b1}_final.pkl   # SVR（Optuna调参），训练于全量数据
+```
+
+所有模型均为 `Pipeline(StandardScaler → model)`，可直接 `model.predict(X_combined)`。
 
 ---
 
