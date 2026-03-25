@@ -1,6 +1,6 @@
 """
 Step 1: Data Preprocessing
-- Read data.txt (SMILES + IC50_B2 + IC50_B1)
+- Read data.in (SMILES + IC50_B2 + IC50_B1)
 - Parse and clean activity values (remove 0, >, <, n.d.)
 - Convert IC50 (uM) to pIC50
 - Standardize SMILES (desalt, uncharge, normalize)
@@ -11,13 +11,17 @@ Step 1: Data Preprocessing
 import pandas as pd
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import SaltRemover
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.inchi import MolToInchiKey
 
+# Instantiate once (loading salt list per-call is expensive and fragile)
+_normalizer = rdMolStandardize.Normalizer()
+_uncharger   = rdMolStandardize.Uncharger()
+_chooser     = rdMolStandardize.LargestFragmentChooser()
+
 # ── 1. Read raw data ──────────────────────────────────────────────────────────
-df = pd.read_csv("data.txt", sep="\t", header=0,
-                 names=["smiles", "IC50_B2_uM", "IC50_B1_uM"])
+df = pd.read_csv("data.in", sep="\t", header=0,
+                 names=["smiles", "IC50_B1_uM", "IC50_B2_uM"])
 print(f"原始行数: {len(df)}")
 
 # ── 2. Parse activity values ──────────────────────────────────────────────────
@@ -53,24 +57,20 @@ print(f"B1 有效数据: {df['pIC50_B1'].notna().sum()}")
 
 # ── 3. Standardize SMILES ─────────────────────────────────────────────────────
 def standardize_smiles(smi):
-    """Desalt, uncharge, normalize SMILES."""
+    """Keep largest fragment, normalize, uncharge, return canonical SMILES."""
     try:
         mol = Chem.MolFromSmiles(smi)
         if mol is None:
             return None
-
-        remover = SaltRemover.SaltRemover()
-        mol = remover.StripMol(mol)
-
-        standardizer = rdMolStandardize.Standardizer()
-        mol = standardizer.standardize(mol)
-
-        uncharger = rdMolStandardize.Uncharger()
-        mol = uncharger.uncharge(mol)
-
-        chooser = rdMolStandardize.LargestFragmentChooser()
-        mol = chooser.choose(mol)
-
+        mol = _chooser.choose(mol)      # desalt via largest fragment
+        if mol is None:
+            return None
+        mol = _normalizer.normalize(mol)
+        if mol is None:
+            return None
+        mol = _uncharger.uncharge(mol)
+        if mol is None:
+            return None
         return Chem.MolToSmiles(mol, isomericSmiles=True)
     except Exception:
         return None

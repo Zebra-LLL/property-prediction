@@ -1,0 +1,25 @@
+name: cyp11b_qsar
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  # 必须走 conda-forge，pip 安装 rdkit 易报 segfault
+  - rdkit=2024.03
+  - pandas
+  - numpy
+  - scikit-learn
+  - matplotlib
+  - scipy
+  - joblib
+  - pip
+  - pip:
+    - xgboost>=2.0
+    - lightgbm
+    - shap>=0.44.0
+    # 可选：DeepChem / AttentiveFP（图神经网络，当前流程未启用）
+    # 取消注释以安装（需下载 PyTorch，约 1GB）
+    # - torch==2.1.0
+    # - deepchem
