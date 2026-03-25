@@ -43,3 +43,48 @@ rdkit, pandas, numpy, scikit-learn, xgboost, lightgbm, deepchem, shap, matplotli
 - 遇到报错自行调试修复，无需中断询问
 - 优先使用 scaffold split 评估模型，随机划分仅作对比参考
 - 所有模型均需输出：R²、RMSE、MAE、Pearson r 以及 parity plot
+
+---
+
+## 已完成进度
+
+### 已创建脚本（branch: `claude/read-claude-md-EiqFB`）
+
+| 脚本 | 功能 | 输出 |
+|------|------|------|
+| `step1_preprocess.py` | 数据清洗、SMILES标准化、pIC50换算、InChIKey去重 | `data_cleaned.csv` |
+| `step2_features.py` | ECFP4(2048-bit) + RDKit 2D描述符（方差过滤） | `features/*.npy`, `features/*.pkl` |
+| `step3_split.py` | Bemis-Murcko scaffold split + 随机划分 | `splits/*.npz` |
+| `step4_train.py` | RF + XGBoost，B2/B1 各两套（scaffold + random），共8个模型 | `models/*.pkl` |
+| `step5_evaluate.py` | R²、RMSE、MAE、Pearson r，parity plot，富集因子 | `results/metrics_summary.csv`, `results/parity_*.png` |
+| `step6_shap.py` | XGBoost SHAP全局重要性图 + 单化合物force plot | `results/shap_*.png`, `results/feature_importance_*.csv` |
+| `run_pipeline.sh` | 一键执行全流程 | — |
+
+**执行方式**：将 `data.txt` 放入根目录后运行 `bash run_pipeline.sh`
+
+### 待完成
+
+- [ ] 提供 `data.txt` 后实际运行流程并检查输出
+- [ ] 根据运行结果决定是否引入 RDKit 描述符或组合特征
+- [ ] 如需可解释性分析，切换为描述符特征后重新运行 SHAP
+
+---
+
+## 已知问题与注意事项
+
+### 单位假设硬编码（重要）
+
+`step1_preprocess.py` 中的 pIC50 换算公式固定假设 **IC50 单位为 μM**：
+
+```python
+pIC50 = 6 - log10(IC50_uM)   # 仅适用于 μM 单位
+```
+
+| 实际单位 | 套用现有公式的结果 |
+|---------|-----------------|
+| μM | 正确 |
+| nM | pIC50 **偏低 3 个单位**（活性被严重低估） |
+| mM | pIC50 **偏高 3 个单位** |
+
+**当前数据（专利来源）明确标注单位为 μM，公式正确。**
+若后续引入其他来源数据（如 ChEMBL、内部实验），必须先统一单位再运行脚本，或在 `step1_preprocess.py` 中添加单位转换逻辑。
