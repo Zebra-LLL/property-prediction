@@ -190,16 +190,20 @@ ValueError: could not convert string to float: '[7.754658E0]'
 - **`step6_shap.py`**：新增 `patch_xgb_base_score()` 函数，加载模型后立即修复 booster config 中的括号格式（兼容已有的保存模型）
 
 ```python
-# step6_shap.py 中的修复函数
+# step6_shap.py 中的修复函数（必须用 save_raw/load_model，不能用 save_config/load_config）
 def patch_xgb_base_score(model):
     booster = model.get_booster()
-    cfg = json.loads(booster.save_config())
-    bs = cfg["learner"]["learner_model_param"].get("base_score", "0.5")
-    if isinstance(bs, str) and bs.startswith("["):
-        cfg["learner"]["learner_model_param"]["base_score"] = str(float(bs.strip("[]")))
-        booster.load_config(json.dumps(cfg))
+    raw = json.loads(booster.save_raw("json").decode())   # 读模型二进制数据
+    lmp = raw["learner"]["learner_model_param"]
+    bs = lmp.get("base_score", "0.5")
+    if isinstance(bs, str) and "[" in bs:                 # '[5E-1]' -> '0.5'
+        lmp["base_score"] = str(float(bs.strip("[]")))
+        booster.load_model(bytearray(json.dumps(raw).encode()))
     return model
 ```
+
+> **注意**：`save_config()/load_config()` 操作的是训练超参数，不含 `learner_model_param`；
+> SHAP 通过 `save_raw('json')` 读取模型数据，因此 patch 必须走 `save_raw/load_model` 路径。
 
 ### XGBoost early_stopping_rounds 参数位置修正（XGBoost ≥ 2.0）
 
