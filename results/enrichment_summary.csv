@@ -1,0 +1,13 @@
+model,top_frac,EF
+RF_b2_scaffold,0.05,2.06
+RF_b2_scaffold,0.1,1.72
+RF_b2_scaffold,0.2,1.43
+XGB_b2_scaffold,0.05,2.06
+XGB_b2_scaffold,0.1,1.72
+XGB_b2_scaffold,0.2,1.11
+RF_b2_random,0.05,1.25
+RF_b2_random,0.1,0.54
+RF_b2_random,0.2,1.0
+XGB_b2_random,0.05,0.62
+XGB_b2_random,0.1,0.54
+XGB_b2_random,0.2,1.0
