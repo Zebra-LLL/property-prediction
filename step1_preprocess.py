@@ -17,7 +17,7 @@ from rdkit.Chem.inchi import MolToInchiKey
 
 # ── 1. Read raw data ──────────────────────────────────────────────────────────
 df = pd.read_csv("data.in", sep="\t", header=0,
-                 names=["smiles", "IC50_B2_uM", "IC50_B1_uM"])
+                 names=["smiles", "IC50_B1_uM", "IC50_B2_uM"])
 print(f"原始行数: {len(df)}")
 
 # ── 2. Parse activity values ──────────────────────────────────────────────────
