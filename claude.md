@@ -117,7 +117,7 @@ pip install deepchem
 | `train_final_models.py` | 用最优Optuna参数在全量数据上训练最终SVR模型 | `models/final_model_B2.pkl`, `models/final_model_B1.pkl`, `models/feature_selector.pkl` |
 | `predict.py` | 对新分子预测 pIC50_B2 / pIC50_B1（CLI，支持单个SMILES / .smi / .csv） | 打印结果或 `--output predictions.csv` |
 | `utils.py` | 共享工具类（`IndexSelector`），feature_selector.pkl 反序列化依赖此文件 | — |
-| `step6_shap.py` | XGBoost SHAP全局重要性图 + 单化合物force plot | `results/shap_*.png`, `results/feature_importance_*.csv` |
+| `step6_shap.py` | XGBoost SHAP全局重要性图（B2/B1）+ SVR排列重要性 | `results/shap_summary_{b2,b1}.png`, `results/shap_force_top_{b2,b1}.png`, `results/feature_importance_xgb_{b2,b1}.csv`, `results/perm_importance_svr_{b2,b1}.csv` |
 | `plot_cv_parity.py` | Stratified-scaffold CV parity plot（XGB + SVR） | `figures/cv_parity_xgb_svr.png` |
 | `plot_ef.py` | EF@10% / EF@20% 富集因子（stratified-scaffold CV） | `figures/ef_barplot.png` |
 | `run_pipeline.sh` | 一键执行全流程 | — |
@@ -130,6 +130,21 @@ python predict.py --smiles "SMILES字符串"
 python predict.py --input compounds.smi
 python predict.py --input compounds.csv --smiles_col smiles --output predictions.csv
 ```
+
+### 可解释性分析结果（step6_shap.py）
+
+**XGB SHAP Top 特征（基于全量训练数据）：**
+
+| 靶标 | Top 1 | Top 2 | Top 3 | 解读 |
+|------|-------|-------|-------|------|
+| CYP11B2 | HallKierAlpha | SlogP_VSA3 | MinEStateIndex | 分子形状/柔性、疏水表面积、电子状态驱动 B2 活性 |
+| CYP11B1 | fr_NH0（叔胺数） | SlogP_VSA2 | VSA_EState2 | 叔胺基团是 B1 选择性关键因素 |
+
+**SVR 排列重要性 Top 特征：** 以 ECFP4 结构指纹为主（局部结构信息），与 XGBoost 互补。
+
+> 注：ECFP4_bit* 特征无直接化学名称，需通过 bit 到子结构的反映射进行解读。
+
+---
 
 ### 建模策略（2026-03-25 更新）
 
@@ -224,6 +239,16 @@ models/svr_{b2,b1}_final.pkl   # SVR（同参数，与 final_model 等价）
 ---
 
 ## 已知问题与注意事项
+
+### step6_shap.py 适配新模型结构（已更新）
+
+`step6_shap.py` 已从旧版（针对 `_stratified_scaffold.pkl` + test_idx + X_combined 2189d）更新为：
+- 加载 `xgb_{b2,b1}_final.pkl`（Pipeline 步骤键 `"sc"` + `"xgb"`）
+- 加载 `final_model_B2/B1.pkl` 用于 SVR 排列重要性
+- 使用 `X_selected`（300d）和对应的 300 个特征名
+- 全量有效数据（无 test_idx 切分）
+
+---
 
 ### SHAP + XGBoost 版本兼容性问题（已修复）
 
