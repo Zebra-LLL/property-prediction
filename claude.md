@@ -115,12 +115,21 @@ pip install deepchem
 | `step3_split.py` | Bemis-Murcko scaffold（保留文件供参考，step4不再使用测试集） | `splits/*.npz` |
 | `step4_train.py` | RF + XGB + SVR，stratified-scaffold 5-fold CV + 最终全量训练 | `models/*_final.pkl`, `models/train_results.pkl` |
 | `train_final_models.py` | 用最优Optuna参数在全量数据上训练最终SVR模型 | `models/final_model_B2.pkl`, `models/final_model_B1.pkl`, `models/feature_selector.pkl` |
+| `predict.py` | 对新分子预测 pIC50_B2 / pIC50_B1（CLI，支持单个SMILES / .smi / .csv） | 打印结果或 `--output predictions.csv` |
+| `utils.py` | 共享工具类（`IndexSelector`），feature_selector.pkl 反序列化依赖此文件 | — |
 | `step6_shap.py` | XGBoost SHAP全局重要性图 + 单化合物force plot | `results/shap_*.png`, `results/feature_importance_*.csv` |
 | `plot_cv_parity.py` | Stratified-scaffold CV parity plot（XGB + SVR） | `figures/cv_parity_xgb_svr.png` |
 | `plot_ef.py` | EF@10% / EF@20% 富集因子（stratified-scaffold CV） | `figures/ef_barplot.png` |
 | `run_pipeline.sh` | 一键执行全流程 | — |
 
 **执行方式**：将 `data.in` 放入根目录后运行 `bash run_pipeline.sh`
+
+**预测新分子：**
+```bash
+python predict.py --smiles "SMILES字符串"
+python predict.py --input compounds.smi
+python predict.py --input compounds.csv --smiles_col smiles --output predictions.csv
+```
 
 ### 建模策略（2026-03-25 更新）
 
