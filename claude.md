@@ -114,6 +114,7 @@ pip install deepchem
 | `step2b_feature_select.py` | 三阶段特征筛选（方差/相关性/RF重要性）+ CV前后对比 | `features/X_selected.npy` (300d) |
 | `step3_split.py` | Bemis-Murcko scaffold（保留文件供参考，step4不再使用测试集） | `splits/*.npz` |
 | `step4_train.py` | RF + XGB + SVR，stratified-scaffold 5-fold CV + 最终全量训练 | `models/*_final.pkl`, `models/train_results.pkl` |
+| `train_final_models.py` | 用最优Optuna参数在全量数据上训练最终SVR模型 | `models/final_model_B2.pkl`, `models/final_model_B1.pkl`, `models/feature_selector.pkl` |
 | `step6_shap.py` | XGBoost SHAP全局重要性图 + 单化合物force plot | `results/shap_*.png`, `results/feature_importance_*.csv` |
 | `plot_cv_parity.py` | Stratified-scaffold CV parity plot（XGB + SVR） | `figures/cv_parity_xgb_svr.png` |
 | `plot_ef.py` | EF@10% / EF@20% 富集因子（stratified-scaffold CV） | `figures/ef_barplot.png` |
@@ -172,15 +173,41 @@ pip install deepchem
 
 保存为 `features/X_selected.npy`（415 × 300）
 
-### 最终模型文件
+### 最终模型文件（用于推断）
 
 ```
-models/rf_{b2,b1}_final.pkl    # Random Forest，训练于全量数据（300d特征）
-models/xgb_{b2,b1}_final.pkl   # XGBoost，训练于全量数据（300d特征）
-models/svr_{b2,b1}_final.pkl   # SVR（Optuna调参），训练于全量数据（300d特征）
+models/feature_selector.pkl    # IndexSelector：X_combined (2189d) → X_selected (300d)
+models/final_model_B2.pkl      # Pipeline(StandardScaler + SVR)，CYP11B2，训练于371个样本
+models/final_model_B1.pkl      # Pipeline(StandardScaler + SVR)，CYP11B1，训练于334个样本
 ```
 
-所有模型均为 `Pipeline(StandardScaler → model)`，可直接 `model.predict(X_selected)`。
+**SVR 最优超参数（Optuna stratified-scaffold CV 搜索）：**
+
+| 模型 | C | ε | γ | 训练集样本数 |
+|------|---|---|---|------------|
+| B2   | 3.41 | 0.112 | 0.00144 | 371 |
+| B1   | 639  | 0.28  | 0.00124 | 334 |
+
+**使用方式：**
+```python
+import joblib, numpy as np
+
+selector = joblib.load("models/feature_selector.pkl")
+model_b2 = joblib.load("models/final_model_B2.pkl")
+model_b1 = joblib.load("models/final_model_B1.pkl")
+
+# X_new_combined: (n_compounds, 2189) — 用 step2_features.py 计算
+X_new_sel = selector.transform(X_new_combined)   # (n_compounds, 300)
+pred_b2   = model_b2.predict(X_new_sel)          # pIC50 CYP11B2
+pred_b1   = model_b1.predict(X_new_sel)          # pIC50 CYP11B1
+```
+
+**CV 评估模型（供参考，不用于推断）：**
+```
+models/rf_{b2,b1}_final.pkl    # Random Forest
+models/xgb_{b2,b1}_final.pkl   # XGBoost
+models/svr_{b2,b1}_final.pkl   # SVR（同参数，与 final_model 等价）
+```
 
 ---
 
