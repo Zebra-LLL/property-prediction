@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 import joblib
 
-from sklearn.base import BaseEstimator, TransformerMixin
+from utils import IndexSelector
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
@@ -42,17 +42,8 @@ print(f"X_combined shape : {X_combined.shape}")
 print(f"Selected indices : {len(selected_idx)} features")
 
 # ── Feature selector ───────────────────────────────────────────────────────────
-class IndexSelector(BaseEstimator, TransformerMixin):
-    """Select columns from X_combined by pre-computed indices."""
-    def __init__(self, indices):
-        self.indices = indices
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        return np.asarray(X)[:, self.indices]
-
+# IndexSelector is defined in utils.py so that joblib.load() works from any script
+# without needing to re-import train_final_models.
 feature_selector = IndexSelector(indices=selected_idx)
 joblib.dump(feature_selector, "models/feature_selector.pkl")
 print("Saved models/feature_selector.pkl")
