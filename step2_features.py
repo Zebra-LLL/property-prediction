@@ -68,6 +68,10 @@ selected_desc_names = [name for name, keep in zip(desc_names, selected_mask) if 
 np.save("features/X_desc.npy", X_desc)
 joblib.dump(imputer,  "features/desc_imputer.pkl")
 joblib.dump(selector, "features/desc_selector.pkl")
+# Save full descriptor name list (pre-imputer) so predict.py can use the
+# exact same descriptor order regardless of RDKit version.
+with open("features/desc_names_all.txt", "w") as f:
+    f.write("\n".join(desc_names))
 with open("features/desc_names.txt", "w") as f:
     f.write("\n".join(selected_desc_names))
 

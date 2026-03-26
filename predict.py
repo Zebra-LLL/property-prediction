@@ -54,7 +54,16 @@ desc_selector    = _load("features/desc_selector.pkl")
 
 # ── Feature calculators (must match step2_features.py exactly) ────────────────
 _morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
-_desc_names = [name for name, _ in Descriptors.descList]
+
+# Load the descriptor list that was used at training time (217 descriptors,
+# rdkit-2025.9.6). Using a fixed list avoids shape mismatches when the local
+# RDKit version has a different number of descriptors in Descriptors.descList.
+_desc_names_all_path = os.path.join(BASE, "features", "desc_names_all.txt")
+if not os.path.exists(_desc_names_all_path):
+    sys.exit("[ERROR] features/desc_names_all.txt not found. "
+             "Re-run step2_features.py to regenerate it.")
+with open(_desc_names_all_path) as _f:
+    _desc_names = [line.strip() for line in _f if line.strip()]
 _calculator = MoleculeDescriptors.MolecularDescriptorCalculator(_desc_names)
 
 
